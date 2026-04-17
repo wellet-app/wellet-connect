@@ -15,13 +15,10 @@ class SupabaseService {
 
   // --- Auth ---
 
-  Future<AuthResponse> signIn({
-    required String email,
-    required String password,
-  }) async {
-    return await _client.auth.signInWithPassword(
+  Future<void> signInWithMagicLink({required String email}) async {
+    await _client.auth.signInWithOtp(
       email: email,
-      password: password,
+      emailRedirectTo: 'com.wellet.connect://login-callback',
     );
   }
 
@@ -36,14 +33,37 @@ class SupabaseService {
   // --- Person ---
 
   Future<Person?> getPersonForUser(String userId) async {
-    final response = await _client
+    // First check if this user has a direct person row
+    final directMatch = await _client
         .from(AppConstants.peopleTable)
         .select()
         .eq('user_id', userId)
         .maybeSingle();
 
-    if (response == null) return null;
-    return Person.fromJson(response);
+    if (directMatch != null) return Person.fromJson(directMatch);
+
+    // Fall back: check care_circle_members for a matching email
+    final user = currentUser;
+    if (user?.email != null) {
+      final memberMatch = await _client
+          .from(AppConstants.careCircleMembersTable)
+          .select('person_id')
+          .eq('email', user!.email!)
+          .maybeSingle();
+
+      if (memberMatch != null) {
+        final personId = memberMatch['person_id'] as String;
+        final personRow = await _client
+            .from(AppConstants.peopleTable)
+            .select()
+            .eq('id', personId)
+            .maybeSingle();
+
+        if (personRow != null) return Person.fromJson(personRow);
+      }
+    }
+
+    return null;
   }
 
   // --- Vitals ---
@@ -62,10 +82,18 @@ class SupabaseService {
         .from(AppConstants.vitalsTable)
         .select()
         .eq('person_id', personId)
-        .gte('recorded_at', cutoff)
-        .order('recorded_at', ascending: false);
+        .gte('effective_date', cutoff)
+        .order('effective_date', ascending: false);
 
     return (response as List).map((v) => Vital.fromJson(v)).toList();
+  }
+
+  // --- Health Events ---
+
+  Future<void> insertHealthEvents(
+      List<Map<String, dynamic>> events) async {
+    if (events.isEmpty) return;
+    await _client.from(AppConstants.healthEventsTable).upsert(events);
   }
 
   // --- Medications ---
@@ -76,9 +104,20 @@ class SupabaseService {
         .select()
         .eq('person_id', personId)
         .eq('active', true)
-        .order('scheduled_time', ascending: true);
+        .order('name', ascending: true);
 
     return (response as List).map((m) => Medication.fromJson(m)).toList();
+  }
+
+  Future<List<Map<String, dynamic>>> getMedicationReminders(
+      String personId) async {
+    final response = await _client
+        .from(AppConstants.medicationRemindersTable)
+        .select()
+        .eq('person_id', personId)
+        .eq('active', true);
+
+    return List<Map<String, dynamic>>.from(response as List);
   }
 
   RealtimeChannel subscribeMedications(
@@ -118,7 +157,7 @@ class SupabaseService {
         .from(AppConstants.medicationLogsTable)
         .select()
         .eq('person_id', personId)
-        .order('logged_at', ascending: false)
+        .order('taken_at', ascending: false)
         .limit(limit);
 
     return (response as List).map((l) => MedicationLog.fromJson(l)).toList();
@@ -126,9 +165,9 @@ class SupabaseService {
 
   // --- Check-in ---
 
-  Future<void> insertCheckinResponse(CheckinResponse checkin) async {
+  Future<void> insertCheckin(CheckinResponse checkin) async {
     await _client
-        .from(AppConstants.checkinResponsesTable)
+        .from(AppConstants.checkInsTable)
         .insert(checkin.toJson());
   }
 
@@ -137,7 +176,7 @@ class SupabaseService {
     final startOfDay = DateTime(today.year, today.month, today.day);
 
     final response = await _client
-        .from(AppConstants.checkinResponsesTable)
+        .from(AppConstants.checkInsTable)
         .select()
         .eq('person_id', personId)
         .gte('checked_in_at', startOfDay.toIso8601String())

@@ -4,6 +4,7 @@ import '../config/constants.dart';
 import '../models/medication.dart';
 import '../models/medication_log.dart';
 import '../services/supabase_service.dart';
+import '../services/notification_service.dart';
 import '../services/offline_queue_service.dart';
 import 'auth_provider.dart';
 
@@ -38,13 +39,17 @@ class MedicationState {
 class MedicationNotifier extends StateNotifier<MedicationState> {
   final SupabaseService _supabaseService;
   final OfflineQueueService? _offlineQueue;
+  final NotificationService? _notificationService;
   final String? _personId;
+  final String? _userId;
   RealtimeChannel? _subscription;
 
   MedicationNotifier(
     this._supabaseService,
     this._offlineQueue,
+    this._notificationService,
     this._personId,
+    this._userId,
   ) : super(const MedicationState()) {
     if (_personId != null) {
       loadMedications();
@@ -59,8 +64,23 @@ class MedicationNotifier extends StateNotifier<MedicationState> {
       final meds = await _supabaseService.getMedications(_personId!);
       final logs =
           await _supabaseService.getRecentMedicationLogs(_personId!);
+
+      // Load medication reminders and attach to medications
+      final reminders =
+          await _supabaseService.getMedicationReminders(_personId!);
+      final medsWithReminders = _attachReminders(meds, reminders);
+
+      // Schedule local notifications for each medication's reminders
+      if (_notificationService != null) {
+        for (final med in medsWithReminders) {
+          if (med.reminderTimes.isNotEmpty) {
+            await _notificationService!.scheduleMedicationReminders(med);
+          }
+        }
+      }
+
       state = state.copyWith(
-        medications: meds,
+        medications: medsWithReminders,
         recentLogs: logs,
         isLoading: false,
       );
@@ -69,12 +89,37 @@ class MedicationNotifier extends StateNotifier<MedicationState> {
     }
   }
 
+  List<Medication> _attachReminders(
+    List<Medication> meds,
+    List<Map<String, dynamic>> reminders,
+  ) {
+    return meds.map((med) {
+      final matching = reminders.where(
+        (r) => r['medication_id'] == med.id,
+      );
+      if (matching.isEmpty) return med;
+
+      final times = <String>[];
+      for (final r in matching) {
+        final reminderTimes = r['reminder_times'];
+        if (reminderTimes is List) {
+          times.addAll(reminderTimes.cast<String>());
+        }
+      }
+      return med.copyWith(reminderTimes: times);
+    }).toList();
+  }
+
   void _subscribeMedications() {
     if (_personId == null) return;
     _subscription = _supabaseService.subscribeMedications(
       _personId!,
-      (meds) {
-        state = state.copyWith(medications: meds);
+      (meds) async {
+        // Re-attach reminders on realtime update
+        final reminders =
+            await _supabaseService.getMedicationReminders(_personId!);
+        final medsWithReminders = _attachReminders(meds, reminders);
+        state = state.copyWith(medications: medsWithReminders);
       },
     );
   }
@@ -83,13 +128,15 @@ class MedicationNotifier extends StateNotifier<MedicationState> {
     required String medicationId,
     required MedicationAction action,
   }) async {
-    if (_personId == null) return;
+    if (_personId == null || _userId == null) return;
 
     final log = MedicationLog(
       medicationId: medicationId,
       personId: _personId!,
+      userId: _userId!,
       action: action,
-      loggedAt: DateTime.now(),
+      takenAt: DateTime.now(),
+      source: 'wellet_connect',
     );
 
     try {
@@ -133,10 +180,22 @@ final offlineQueueProvider = Provider<OfflineQueueService?>((ref) {
   return null;
 });
 
+final notificationServiceProvider = Provider<NotificationService?>((ref) {
+  // Initialized in main.dart and overridden
+  return null;
+});
+
 final medicationProvider =
     StateNotifierProvider<MedicationNotifier, MedicationState>((ref) {
   final supabaseService = ref.watch(supabaseServiceProvider);
   final offlineQueue = ref.watch(offlineQueueProvider);
+  final notificationService = ref.watch(notificationServiceProvider);
   final auth = ref.watch(authProvider);
-  return MedicationNotifier(supabaseService, offlineQueue, auth.person?.id);
+  return MedicationNotifier(
+    supabaseService,
+    offlineQueue,
+    notificationService,
+    auth.person?.id,
+    auth.user?.id,
+  );
 });

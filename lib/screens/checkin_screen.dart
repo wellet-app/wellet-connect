@@ -71,7 +71,7 @@ class CheckinScreen extends ConsumerWidget {
           ),
           const SizedBox(height: 8),
           Text(
-            'Your family has been notified. Thank you for sharing!',
+            'Thanks for checking in \u{1F49A} Your caregiver will see this.',
             style: GoogleFonts.dmSans(
               fontSize: 18,
               color: WelletTheme.textSecondary,
@@ -118,18 +118,18 @@ class CheckinScreen extends ConsumerWidget {
         const SizedBox(height: 16),
         CheckinButton(
           label: 'Not great',
-          emoji: '\u{1F610}',
+          emoji: '\u{1F614}',
           color: WelletTheme.primary,
           isLoading: state.isSubmitting,
           onPressed: () => _submitCheckin(ref, CheckinMood.notGreat),
         ),
         const SizedBox(height: 16),
         CheckinButton(
-          label: 'Need help',
+          label: 'Bad',
           emoji: '\u{1F198}',
           color: WelletTheme.error,
           isLoading: state.isSubmitting,
-          onPressed: () => _submitCheckin(ref, CheckinMood.needHelp),
+          onPressed: () => _submitCheckin(ref, CheckinMood.bad),
         ),
         const Spacer(flex: 2),
       ],

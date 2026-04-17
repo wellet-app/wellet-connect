@@ -50,12 +50,14 @@ class HealthSyncService {
     final uniqueData = Health.removeDuplicates(healthData);
 
     return uniqueData.map((point) {
+      final numValue = _extractNumericValue(point.value);
       return Vital(
         personId: personId,
-        type: _healthTypeToString(point.type),
-        value: _extractNumericValue(point.value),
-        unit: point.unitString,
-        recordedAt: point.dateFrom,
+        vitalType: _healthTypeToVitalType(point.type),
+        value: numValue.toString(),
+        unit: _healthTypeToUnit(point.type),
+        effectiveDate: point.dateFrom,
+        source: 'apple_health',
       );
     }).toList();
   }
@@ -63,29 +65,132 @@ class HealthSyncService {
   Future<void> syncToSupabase(
       SupabaseService supabaseService, String personId) async {
     final vitals = await fetchHealthData(personId);
-    if (vitals.isNotEmpty) {
-      await supabaseService.upsertVitals(vitals);
+    if (vitals.isEmpty) return;
+
+    // Write to vitals table
+    await supabaseService.upsertVitals(vitals);
+
+    // Also write to health_events table for timeline visibility
+    final healthEvents = _buildHealthEvents(vitals, personId);
+    await supabaseService.insertHealthEvents(healthEvents);
+  }
+
+  List<Map<String, dynamic>> _buildHealthEvents(
+      List<Vital> vitals, String personId) {
+    final events = <Map<String, dynamic>>[];
+
+    // Aggregate steps
+    double totalSteps = 0;
+    DateTime? latestStepDate;
+    for (final v in vitals) {
+      if (v.vitalType == 'Steps') {
+        totalSteps += v.numericValue;
+        final d = v.effectiveDate;
+        if (d != null && (latestStepDate == null || d.isAfter(latestStepDate))) {
+          latestStepDate = d;
+        }
+      }
+    }
+    if (totalSteps > 0) {
+      events.add({
+        'person_id': personId,
+        'event_type': 'activity',
+        'event_date': (latestStepDate ?? DateTime.now()).toIso8601String(),
+        'title': '${totalSteps.toInt()} steps',
+        'value': totalSteps,
+        'unit': 'steps',
+        'source': 'apple_health',
+        'accepted': true,
+      });
+    }
+
+    // Aggregate sleep
+    double totalSleepMin = 0;
+    DateTime? latestSleepDate;
+    for (final v in vitals) {
+      if (v.vitalType == 'Sleep') {
+        totalSleepMin += v.numericValue;
+        final d = v.effectiveDate;
+        if (d != null &&
+            (latestSleepDate == null || d.isAfter(latestSleepDate))) {
+          latestSleepDate = d;
+        }
+      }
+    }
+    if (totalSleepMin > 0) {
+      final hours = (totalSleepMin / 60.0).toStringAsFixed(1);
+      events.add({
+        'person_id': personId,
+        'event_type': 'sleep',
+        'event_date': (latestSleepDate ?? DateTime.now()).toIso8601String(),
+        'title': '$hours hours of sleep',
+        'value': totalSleepMin,
+        'unit': 'min',
+        'source': 'apple_health',
+        'accepted': true,
+      });
+    }
+
+    // Individual vital events (heart rate, BP, blood oxygen, weight)
+    for (final v in vitals) {
+      if (v.vitalType == 'Steps' || v.vitalType == 'Sleep') continue;
+
+      events.add({
+        'person_id': personId,
+        'event_type': 'vital',
+        'event_date':
+            (v.effectiveDate ?? DateTime.now()).toIso8601String(),
+        'title': '${v.vitalType}: ${v.value} ${v.unit ?? ''}',
+        'value': v.numericValue,
+        'unit': v.unit,
+        'source': 'apple_health',
+        'accepted': true,
+      });
+    }
+
+    return events;
+  }
+
+  /// Map HealthDataType to the vital_type strings expected by the DB
+  static String _healthTypeToVitalType(HealthDataType type) {
+    switch (type) {
+      case HealthDataType.STEPS:
+        return 'Steps';
+      case HealthDataType.HEART_RATE:
+        return 'Heart Rate';
+      case HealthDataType.BLOOD_PRESSURE_SYSTOLIC:
+        return 'Blood Pressure Systolic';
+      case HealthDataType.BLOOD_PRESSURE_DIASTOLIC:
+        return 'Blood Pressure Diastolic';
+      case HealthDataType.BLOOD_OXYGEN:
+        return 'Blood Oxygen';
+      case HealthDataType.SLEEP_ASLEEP:
+        return 'Sleep';
+      case HealthDataType.WEIGHT:
+        return 'Weight';
+      default:
+        return type.name;
     }
   }
 
-  static String _healthTypeToString(HealthDataType type) {
+  /// Map HealthDataType to the unit strings expected by the DB
+  static String _healthTypeToUnit(HealthDataType type) {
     switch (type) {
       case HealthDataType.STEPS:
         return 'steps';
       case HealthDataType.HEART_RATE:
-        return 'heart_rate';
+        return 'bpm';
       case HealthDataType.BLOOD_PRESSURE_SYSTOLIC:
-        return 'blood_pressure_systolic';
       case HealthDataType.BLOOD_PRESSURE_DIASTOLIC:
-        return 'blood_pressure_diastolic';
+        return 'mmHg';
       case HealthDataType.BLOOD_OXYGEN:
-        return 'blood_oxygen';
+        return '%';
       case HealthDataType.SLEEP_ASLEEP:
-        return 'sleep';
+        return 'min';
       case HealthDataType.WEIGHT:
-        return 'weight';
+        return 'kg';
       default:
-        return type.name.toLowerCase();
+        return '';
     }
   }
 

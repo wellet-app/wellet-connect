@@ -16,12 +16,14 @@ class AuthState {
   final User? user;
   final Person? person;
   final String? error;
+  final bool magicLinkSent;
 
   const AuthState({
     this.status = AuthStatus.unknown,
     this.user,
     this.person,
     this.error,
+    this.magicLinkSent = false,
   });
 
   AuthState copyWith({
@@ -29,12 +31,14 @@ class AuthState {
     User? user,
     Person? person,
     String? error,
+    bool? magicLinkSent,
   }) {
     return AuthState(
       status: status ?? this.status,
       user: user ?? this.user,
       person: person ?? this.person,
       error: error,
+      magicLinkSent: magicLinkSent ?? this.magicLinkSent,
     );
   }
 }
@@ -80,19 +84,12 @@ class AuthNotifier extends StateNotifier<AuthState> {
     }
   }
 
-  Future<void> signIn({
-    required String email,
-    required String password,
-  }) async {
-    state = state.copyWith(error: null);
+  /// Send a magic link to the given email address
+  Future<void> sendMagicLink({required String email}) async {
+    state = state.copyWith(error: null, magicLinkSent: false);
     try {
-      final response = await _supabaseService.signIn(
-        email: email,
-        password: password,
-      );
-      if (response.user != null) {
-        await _loadPerson(response.user!);
-      }
+      await _supabaseService.signInWithMagicLink(email: email);
+      state = state.copyWith(magicLinkSent: true);
     } on AuthException catch (e) {
       state = state.copyWith(
         status: AuthStatus.unauthenticated,
