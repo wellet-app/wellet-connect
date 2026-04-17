@@ -40,10 +40,10 @@ class MedicationCard extends StatelessWidget {
             ),
             const SizedBox(height: 4),
 
-            // Dosage and frequency
-            if (medication.dosage != null || medication.frequency != null)
+            // Dose and frequency
+            if (medication.dose != null || medication.frequency != null)
               Text(
-                [medication.dosage, medication.frequency]
+                [medication.dose, medication.frequency]
                     .where((s) => s != null)
                     .join(' \u2022 '),
                 style: GoogleFonts.dmSans(
@@ -52,8 +52,8 @@ class MedicationCard extends StatelessWidget {
                 ),
               ),
 
-            // Scheduled time
-            if (medication.scheduledTime != null) ...[
+            // Reminder times from medication_reminders table
+            if (medication.reminderTimes.isNotEmpty) ...[
               const SizedBox(height: 4),
               Row(
                 children: [
@@ -63,12 +63,16 @@ class MedicationCard extends StatelessWidget {
                     color: WelletTheme.textSecondary,
                   ),
                   const SizedBox(width: 6),
-                  Text(
-                    'Next: ${_formatTime(medication.scheduledTime!)}',
-                    style: GoogleFonts.dmSans(
-                      fontSize: 18,
-                      color: WelletTheme.primary,
-                      fontWeight: FontWeight.w500,
+                  Expanded(
+                    child: Text(
+                      medication.reminderTimes
+                          .map(_formatTime)
+                          .join(', '),
+                      style: GoogleFonts.dmSans(
+                        fontSize: 18,
+                        color: WelletTheme.primary,
+                        fontWeight: FontWeight.w500,
+                      ),
                     ),
                   ),
                 ],

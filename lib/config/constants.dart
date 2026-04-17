@@ -14,9 +14,11 @@ class AppConstants {
   static const String vitalsTable = 'vitals';
   static const String healthEventsTable = 'health_events';
   static const String medicationsTable = 'medications';
+  static const String medicationRemindersTable = 'medication_reminders';
   static const String medicationLogsTable = 'medication_logs';
-  static const String checkinResponsesTable = 'checkin_responses';
+  static const String checkInsTable = 'check_ins';
   static const String peopleTable = 'people';
+  static const String careCircleMembersTable = 'care_circle_members';
 
   // Privacy message
   static const String privacyMessage =

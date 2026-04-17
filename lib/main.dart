@@ -23,13 +23,14 @@ Future<void> main() async {
   final offlineQueue = OfflineQueueService(offlineDb, supabaseService);
   await offlineQueue.initialize();
 
-  // Initialize notifications (wrapped in try-catch for platforms without Firebase)
+  // Initialize local notifications (no Firebase dependency)
+  NotificationService? notificationService;
   try {
-    final notificationService = NotificationService();
+    notificationService = NotificationService();
     await notificationService.initialize();
     await notificationService.scheduleDailyCheckinReminder();
   } catch (_) {
-    // Firebase not configured yet — notifications will be enabled later
+    // Local notifications not available on this platform
   }
 
   // Flush any pending offline operations
@@ -43,6 +44,8 @@ Future<void> main() async {
     ProviderScope(
       overrides: [
         offlineQueueProvider.overrideWithValue(offlineQueue),
+        if (notificationService != null)
+          notificationServiceProvider.overrideWithValue(notificationService),
       ],
       child: const WelletConnectApp(),
     ),

@@ -41,11 +41,13 @@ class CheckinNotifier extends StateNotifier<CheckinState> {
   final SupabaseService _supabaseService;
   final OfflineQueueService? _offlineQueue;
   final String? _personId;
+  final String? _userId;
 
   CheckinNotifier(
     this._supabaseService,
     this._offlineQueue,
     this._personId,
+    this._userId,
   ) : super(const CheckinState()) {
     if (_personId != null) {
       loadTodayCheckin();
@@ -67,13 +69,15 @@ class CheckinNotifier extends StateNotifier<CheckinState> {
   }
 
   Future<void> submitCheckin(CheckinMood mood) async {
-    if (_personId == null) return;
+    if (_personId == null || _userId == null) return;
     state = state.copyWith(isSubmitting: true, error: null);
 
     final response = CheckinResponse(
       personId: _personId!,
+      userId: _userId!,
       mood: mood,
       checkedInAt: DateTime.now(),
+      source: 'wellet_connect',
     );
 
     try {
@@ -82,10 +86,10 @@ class CheckinNotifier extends StateNotifier<CheckinState> {
           : true;
 
       if (hasConnection) {
-        await _supabaseService.insertCheckinResponse(response);
+        await _supabaseService.insertCheckin(response);
       } else {
         await _offlineQueue?.enqueue(
-          table: AppConstants.checkinResponsesTable,
+          table: AppConstants.checkInsTable,
           operation: 'insert',
           data: response.toJson(),
         );
@@ -98,7 +102,7 @@ class CheckinNotifier extends StateNotifier<CheckinState> {
     } catch (e) {
       // Queue offline if network error
       await _offlineQueue?.enqueue(
-        table: AppConstants.checkinResponsesTable,
+        table: AppConstants.checkInsTable,
         operation: 'insert',
         data: response.toJson(),
       );
@@ -115,5 +119,10 @@ final checkinProvider =
   final supabaseService = ref.watch(supabaseServiceProvider);
   final offlineQueue = ref.watch(offlineQueueProvider);
   final auth = ref.watch(authProvider);
-  return CheckinNotifier(supabaseService, offlineQueue, auth.person?.id);
+  return CheckinNotifier(
+    supabaseService,
+    offlineQueue,
+    auth.person?.id,
+    auth.user?.id,
+  );
 });

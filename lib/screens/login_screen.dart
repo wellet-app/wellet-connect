@@ -14,26 +14,22 @@ class LoginScreen extends ConsumerStatefulWidget {
 
 class _LoginScreenState extends ConsumerState<LoginScreen> {
   final _emailController = TextEditingController();
-  final _passwordController = TextEditingController();
   final _formKey = GlobalKey<FormState>();
   bool _isLoading = false;
-  bool _obscurePassword = true;
 
   @override
   void dispose() {
     _emailController.dispose();
-    _passwordController.dispose();
     super.dispose();
   }
 
-  Future<void> _handleSignIn() async {
+  Future<void> _handleSendMagicLink() async {
     if (!_formKey.currentState!.validate()) return;
 
     setState(() => _isLoading = true);
 
-    await ref.read(authProvider.notifier).signIn(
+    await ref.read(authProvider.notifier).sendMagicLink(
           email: _emailController.text.trim(),
-          password: _passwordController.text,
         );
 
     if (mounted) {
@@ -115,6 +111,54 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                   const SizedBox(height: 16),
                 ],
 
+                // Magic link sent confirmation
+                if (authState.magicLinkSent) ...[
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.all(20),
+                    decoration: BoxDecoration(
+                      color: WelletTheme.success.withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(16),
+                      border: Border.all(
+                        color: WelletTheme.success.withOpacity(0.3),
+                      ),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            const Icon(
+                              Icons.mark_email_read,
+                              color: WelletTheme.success,
+                              size: 28,
+                            ),
+                            const SizedBox(width: 12),
+                            Text(
+                              'Check your email',
+                              style: GoogleFonts.dmSans(
+                                fontSize: 22,
+                                fontWeight: FontWeight.w700,
+                                color: WelletTheme.success,
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 12),
+                        Text(
+                          'We sent a sign-in link to ${_emailController.text.trim()}. '
+                          'Tap the link in the email to sign in.',
+                          style: GoogleFonts.dmSans(
+                            fontSize: 18,
+                            color: WelletTheme.textSecondary,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 24),
+                ],
+
                 // Email field
                 Semantics(
                   label: 'Email address',
@@ -122,7 +166,8 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                     controller: _emailController,
                     keyboardType: TextInputType.emailAddress,
                     autocorrect: false,
-                    style: GoogleFonts.dmSans(fontSize: AppConstants.minFontSize),
+                    style:
+                        GoogleFonts.dmSans(fontSize: AppConstants.minFontSize),
                     decoration: const InputDecoration(
                       labelText: 'Email address',
                       hintText: 'you@example.com',
@@ -138,51 +183,17 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                     },
                   ),
                 ),
-                const SizedBox(height: 16),
-
-                // Password field
-                Semantics(
-                  label: 'Password',
-                  child: TextFormField(
-                    controller: _passwordController,
-                    obscureText: _obscurePassword,
-                    style: GoogleFonts.dmSans(fontSize: AppConstants.minFontSize),
-                    decoration: InputDecoration(
-                      labelText: 'Password',
-                      suffixIcon: IconButton(
-                        icon: Icon(
-                          _obscurePassword
-                              ? Icons.visibility_outlined
-                              : Icons.visibility_off_outlined,
-                        ),
-                        onPressed: () {
-                          setState(
-                              () => _obscurePassword = !_obscurePassword);
-                        },
-                        tooltip: _obscurePassword
-                            ? 'Show password'
-                            : 'Hide password',
-                      ),
-                    ),
-                    validator: (value) {
-                      if (value == null || value.isEmpty) {
-                        return 'Please enter your password';
-                      }
-                      return null;
-                    },
-                  ),
-                ),
                 const SizedBox(height: 32),
 
-                // Sign in button
+                // Send magic link button
                 Semantics(
                   button: true,
-                  label: 'Sign in',
+                  label: 'Send sign-in link',
                   child: SizedBox(
                     width: double.infinity,
                     height: AppConstants.minTouchTarget,
                     child: ElevatedButton(
-                      onPressed: _isLoading ? null : _handleSignIn,
+                      onPressed: _isLoading ? null : _handleSendMagicLink,
                       child: _isLoading
                           ? const SizedBox(
                               width: 24,
@@ -192,7 +203,11 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                                 color: Colors.white,
                               ),
                             )
-                          : const Text('Sign In'),
+                          : Text(
+                              authState.magicLinkSent
+                                  ? 'Resend Link'
+                                  : 'Send Sign-in Link',
+                            ),
                     ),
                   ),
                 ),
