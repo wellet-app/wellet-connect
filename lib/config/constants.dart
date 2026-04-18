@@ -19,6 +19,7 @@ class AppConstants {
   static const String checkInsTable = 'check_ins';
   static const String peopleTable = 'people';
   static const String careCircleMembersTable = 'care_circle_members';
+  static const String careCircleInvitesTable = 'care_circle_invites';
 
   // Privacy message
   static const String privacyMessage =

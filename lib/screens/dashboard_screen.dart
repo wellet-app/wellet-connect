@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:go_router/go_router.dart';
@@ -7,6 +8,8 @@ import '../providers/auth_provider.dart';
 import '../providers/health_provider.dart';
 import '../providers/medication_provider.dart';
 import '../providers/checkin_provider.dart';
+import '../providers/pairing_provider.dart';
+import '../models/medication_log.dart';
 import '../widgets/vital_card.dart';
 import '../widgets/sync_status_indicator.dart';
 
@@ -33,32 +36,37 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
     final health = ref.watch(healthProvider);
     final medState = ref.watch(medicationProvider);
     final checkin = ref.watch(checkinProvider);
+    final pairing = ref.watch(pairingProvider);
 
     final firstName = auth.person?.firstName ?? 'there';
 
     return Scaffold(
+      backgroundColor: WelletTheme.background,
       appBar: AppBar(
+        backgroundColor: WelletTheme.background,
         title: Text(
           'Wellet',
           style: GoogleFonts.dmSerifDisplay(fontSize: 28),
         ),
         actions: [
           IconButton(
-            icon: const Icon(Icons.logout),
-            tooltip: 'Sign out',
-            onPressed: () => ref.read(authProvider.notifier).signOut(),
+            icon: const Icon(Icons.settings_outlined),
+            tooltip: 'Settings',
+            onPressed: () => context.go('/settings'),
           ),
         ],
       ),
       body: RefreshIndicator(
+        color: WelletTheme.primary,
         onRefresh: () async {
+          HapticFeedback.mediumImpact();
           await ref.read(healthProvider.notifier).refreshSummary();
           await ref.read(medicationProvider.notifier).loadMedications();
           await ref.read(checkinProvider.notifier).loadTodayCheckin();
         },
         child: SingleChildScrollView(
           physics: const AlwaysScrollableScrollPhysics(),
-          padding: const EdgeInsets.all(20),
+          padding: const EdgeInsets.fromLTRB(24, 8, 24, 32),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -74,7 +82,44 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
 
               // Sync status
               const SyncStatusIndicator(),
+              const SizedBox(height: 8),
+
+              // Connected caregiver
+              if (pairing.isPaired && pairing.caregiverName != null)
+                Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                  decoration: BoxDecoration(
+                    color: WelletTheme.primary.withOpacity(0.08),
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Icon(
+                        Icons.people_outline,
+                        size: 18,
+                        color: WelletTheme.primary,
+                      ),
+                      const SizedBox(width: 8),
+                      Text(
+                        "Connected to ${pairing.caregiverName}'s care circle",
+                        style: GoogleFonts.dmSans(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w500,
+                          color: WelletTheme.primary,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
               const SizedBox(height: 24),
+
+              // Check-in prompt
+              if (!checkin.hasCheckedInToday) ...[
+                _buildCheckinPrompt(),
+                const SizedBox(height: 24),
+              ],
 
               // Health summary
               Text(
@@ -122,12 +167,6 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
               ],
               const SizedBox(height: 28),
 
-              // Check-in prompt
-              if (!checkin.hasCheckedInToday) ...[
-                _buildCheckinPrompt(),
-                const SizedBox(height: 28),
-              ],
-
               // Recent medications
               if (medState.recentLogs.isNotEmpty) ...[
                 Text(
@@ -142,7 +181,8 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                   final med = medState.medications.where(
                     (m) => m.id == log.medicationId,
                   );
-                  final name = med.isNotEmpty ? med.first.name : 'Medication';
+                  final name =
+                      med.isNotEmpty ? med.first.name : 'Medication';
                   final action = log.action == MedicationAction.took
                       ? 'Taken'
                       : 'Skipped';
@@ -152,19 +192,29 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                       width: double.infinity,
                       padding: const EdgeInsets.all(16),
                       decoration: BoxDecoration(
-                        color: WelletTheme.surfaceLight,
-                        borderRadius: BorderRadius.circular(12),
+                        color: WelletTheme.surface,
+                        borderRadius: BorderRadius.circular(16),
                       ),
                       child: Row(
                         children: [
-                          Icon(
-                            log.action == MedicationAction.took
-                                ? Icons.check_circle
-                                : Icons.cancel,
-                            color: log.action == MedicationAction.took
-                                ? WelletTheme.success
-                                : WelletTheme.error,
-                            size: 28,
+                          Container(
+                            width: 40,
+                            height: 40,
+                            decoration: BoxDecoration(
+                              color: log.action == MedicationAction.took
+                                  ? WelletTheme.success.withOpacity(0.1)
+                                  : WelletTheme.error.withOpacity(0.1),
+                              borderRadius: BorderRadius.circular(10),
+                            ),
+                            child: Icon(
+                              log.action == MedicationAction.took
+                                  ? Icons.check_circle
+                                  : Icons.cancel,
+                              color: log.action == MedicationAction.took
+                                  ? WelletTheme.success
+                                  : WelletTheme.error,
+                              size: 22,
+                            ),
                           ),
                           const SizedBox(width: 12),
                           Expanded(
@@ -176,6 +226,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                                   style: GoogleFonts.dmSans(
                                     fontSize: 20,
                                     fontWeight: FontWeight.w500,
+                                    color: WelletTheme.textPrimary,
                                   ),
                                 ),
                                 Text(
@@ -194,6 +245,53 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                   );
                 }),
               ],
+
+              if (medState.recentLogs.isEmpty &&
+                  medState.medications.isEmpty) ...[
+                Text(
+                  'Medications',
+                  style: GoogleFonts.dmSerifDisplay(
+                    fontSize: 24,
+                    color: WelletTheme.textPrimary,
+                  ),
+                ),
+                const SizedBox(height: 12),
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(24),
+                  decoration: BoxDecoration(
+                    color: WelletTheme.surface,
+                    borderRadius: BorderRadius.circular(16),
+                  ),
+                  child: Column(
+                    children: [
+                      Icon(
+                        Icons.medication_outlined,
+                        size: 40,
+                        color: WelletTheme.textSecondary.withOpacity(0.4),
+                      ),
+                      const SizedBox(height: 12),
+                      Text(
+                        'No medications yet',
+                        style: GoogleFonts.dmSans(
+                          fontSize: 20,
+                          fontWeight: FontWeight.w500,
+                          color: WelletTheme.textPrimary,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        'Your family can add medications from the Wellet dashboard.',
+                        style: GoogleFonts.dmSans(
+                          fontSize: 16,
+                          color: WelletTheme.textSecondary,
+                        ),
+                        textAlign: TextAlign.center,
+                      ),
+                    ],
+                  ),
+                ),
+              ],
             ],
           ),
         ),
@@ -206,28 +304,47 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
       width: double.infinity,
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        color: WelletTheme.surfaceLight,
+        color: WelletTheme.surface,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: WelletTheme.primary.withOpacity(0.3)),
+        border: Border.all(color: WelletTheme.primary.withOpacity(0.2)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            'Health Data Access',
-            style: GoogleFonts.dmSans(
-              fontSize: 20,
-              fontWeight: FontWeight.w700,
-              color: WelletTheme.textPrimary,
-            ),
+          Row(
+            children: [
+              Container(
+                width: 40,
+                height: 40,
+                decoration: BoxDecoration(
+                  color: WelletTheme.primary.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: const Icon(
+                  Icons.favorite_outline,
+                  color: WelletTheme.primary,
+                  size: 22,
+                ),
+              ),
+              const SizedBox(width: 12),
+              Text(
+                'Health Data Access',
+                style: GoogleFonts.dmSans(
+                  fontSize: 20,
+                  fontWeight: FontWeight.w700,
+                  color: WelletTheme.textPrimary,
+                ),
+              ),
+            ],
           ),
-          const SizedBox(height: 8),
+          const SizedBox(height: 12),
           Text(
             'Wellet needs to read your health data so your family '
-            "can see how you're doing. We never share this data with anyone else.",
+            "can see how you're doing between visits.",
             style: GoogleFonts.dmSans(
               fontSize: 18,
               color: WelletTheme.textSecondary,
+              height: 1.4,
             ),
           ),
           const SizedBox(height: 16),
@@ -248,17 +365,34 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
 
   Widget _buildCheckinPrompt() {
     return GestureDetector(
-      onTap: () => context.go('/checkin'),
+      onTap: () {
+        HapticFeedback.lightImpact();
+        context.go('/checkin');
+      },
       child: Container(
         width: double.infinity,
         padding: const EdgeInsets.all(20),
         decoration: BoxDecoration(
-          color: WelletTheme.primary.withOpacity(0.1),
+          color: WelletTheme.primary.withOpacity(0.08),
           borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: WelletTheme.primary.withOpacity(0.3)),
+          border: Border.all(color: WelletTheme.primary.withOpacity(0.2)),
         ),
         child: Row(
           children: [
+            Container(
+              width: 48,
+              height: 48,
+              decoration: BoxDecoration(
+                color: WelletTheme.primary.withOpacity(0.15),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: const Icon(
+                Icons.wb_sunny_outlined,
+                color: WelletTheme.primaryDark,
+                size: 24,
+              ),
+            ),
+            const SizedBox(width: 16),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -270,7 +404,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                       color: WelletTheme.primaryDark,
                     ),
                   ),
-                  const SizedBox(height: 4),
+                  const SizedBox(height: 2),
                   Text(
                     'Tap to share how you are feeling',
                     style: GoogleFonts.dmSans(
@@ -284,6 +418,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
             const Icon(
               Icons.arrow_forward_ios,
               color: WelletTheme.primary,
+              size: 18,
             ),
           ],
         ),

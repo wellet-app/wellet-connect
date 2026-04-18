@@ -24,7 +24,7 @@ class MedicationCard extends StatelessWidget {
         margin: const EdgeInsets.only(bottom: 16),
         padding: const EdgeInsets.all(20),
         decoration: BoxDecoration(
-          color: WelletTheme.surfaceLight,
+          color: WelletTheme.surface,
           borderRadius: BorderRadius.circular(16),
         ),
         child: Column(
@@ -52,30 +52,37 @@ class MedicationCard extends StatelessWidget {
                 ),
               ),
 
-            // Reminder times from medication_reminders table
+            // Reminder times
             if (medication.reminderTimes.isNotEmpty) ...[
-              const SizedBox(height: 4),
-              Row(
-                children: [
-                  const Icon(
-                    Icons.access_time,
-                    size: 20,
-                    color: WelletTheme.textSecondary,
-                  ),
-                  const SizedBox(width: 6),
-                  Expanded(
-                    child: Text(
+              const SizedBox(height: 8),
+              Container(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                decoration: BoxDecoration(
+                  color: WelletTheme.primary.withOpacity(0.08),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Icon(
+                      Icons.access_time,
+                      size: 18,
+                      color: WelletTheme.primary,
+                    ),
+                    const SizedBox(width: 6),
+                    Text(
                       medication.reminderTimes
                           .map(_formatTime)
                           .join(', '),
                       style: GoogleFonts.dmSans(
-                        fontSize: 18,
+                        fontSize: 16,
                         color: WelletTheme.primary,
                         fontWeight: FontWeight.w500,
                       ),
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
             ],
 
@@ -106,6 +113,7 @@ class MedicationCard extends StatelessWidget {
                           shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(12),
                           ),
+                          elevation: 0,
                         ),
                       ),
                     ),

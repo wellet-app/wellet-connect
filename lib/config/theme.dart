@@ -4,7 +4,8 @@ import 'package:google_fonts/google_fonts.dart';
 class WelletTheme {
   static const Color primary = Color(0xFF608F7C);
   static const Color primaryDark = Color(0xFF3D6B58);
-  static const Color background = Colors.white;
+  static const Color background = Color(0xFFF7F5F0);
+  static const Color surface = Colors.white;
   static const Color textPrimary = Color(0xFF1A1A1A);
   static const Color textSecondary = Color(0xFF4A4A4A);
   static const Color error = Color(0xFFB00020);
@@ -22,7 +23,7 @@ class WelletTheme {
         primary: primary,
         onPrimary: Colors.white,
         secondary: primaryDark,
-        surface: background,
+        surface: surface,
         error: error,
         brightness: Brightness.light,
       ),
@@ -49,8 +50,9 @@ class WelletTheme {
             fontWeight: FontWeight.w700,
           ),
           shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(16),
+            borderRadius: BorderRadius.circular(12),
           ),
+          elevation: 0,
         ),
       ),
       outlinedButtonTheme: OutlinedButtonThemeData(
@@ -63,13 +65,13 @@ class WelletTheme {
           ),
           side: const BorderSide(color: primary, width: 2),
           shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(16),
+            borderRadius: BorderRadius.circular(12),
           ),
         ),
       ),
       inputDecorationTheme: InputDecorationTheme(
         filled: true,
-        fillColor: surfaceLight,
+        fillColor: surface,
         contentPadding: const EdgeInsets.symmetric(
           horizontal: 20,
           vertical: 18,
@@ -97,14 +99,14 @@ class WelletTheme {
       ),
       cardTheme: CardThemeData(
         elevation: 0,
-        color: surfaceLight,
+        color: surface,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(16),
         ),
         margin: const EdgeInsets.symmetric(vertical: 8),
       ),
       bottomNavigationBarTheme: BottomNavigationBarThemeData(
-        backgroundColor: background,
+        backgroundColor: surface,
         selectedItemColor: primary,
         unselectedItemColor: textSecondary,
         selectedLabelStyle: GoogleFonts.dmSans(
@@ -113,6 +115,7 @@ class WelletTheme {
         ),
         unselectedLabelStyle: GoogleFonts.dmSans(fontSize: 16),
         type: BottomNavigationBarType.fixed,
+        elevation: 8,
       ),
     );
   }

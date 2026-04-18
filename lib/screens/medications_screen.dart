@@ -15,21 +15,29 @@ class MedicationsScreen extends ConsumerWidget {
     final medState = ref.watch(medicationProvider);
 
     return Scaffold(
+      backgroundColor: WelletTheme.background,
       appBar: AppBar(
+        backgroundColor: WelletTheme.background,
         title: Text(
           'Medications',
           style: GoogleFonts.dmSerifDisplay(fontSize: 28),
         ),
       ),
       body: medState.isLoading
-          ? const Center(child: CircularProgressIndicator())
+          ? Center(
+              child: CircularProgressIndicator(
+                color: WelletTheme.primary,
+                backgroundColor: WelletTheme.primary.withOpacity(0.15),
+              ),
+            )
           : medState.medications.isEmpty
               ? _buildEmptyState()
               : RefreshIndicator(
+                  color: WelletTheme.primary,
                   onRefresh: () =>
                       ref.read(medicationProvider.notifier).loadMedications(),
                   child: ListView.builder(
-                    padding: const EdgeInsets.all(20),
+                    padding: const EdgeInsets.all(24),
                     itemCount: medState.medications.length,
                     itemBuilder: (context, index) {
                       final medication = medState.medications[index];
@@ -81,12 +89,20 @@ class MedicationsScreen extends ConsumerWidget {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            const Icon(
-              Icons.medication_outlined,
-              size: 64,
-              color: WelletTheme.textSecondary,
+            Container(
+              width: 80,
+              height: 80,
+              decoration: BoxDecoration(
+                color: WelletTheme.primary.withOpacity(0.08),
+                shape: BoxShape.circle,
+              ),
+              child: Icon(
+                Icons.medication_outlined,
+                size: 40,
+                color: WelletTheme.textSecondary.withOpacity(0.5),
+              ),
             ),
-            const SizedBox(height: 16),
+            const SizedBox(height: 24),
             Text(
               'No medications yet',
               style: GoogleFonts.dmSerifDisplay(
@@ -96,12 +112,15 @@ class MedicationsScreen extends ConsumerWidget {
             ),
             const SizedBox(height: 8),
             Text(
-              'Your family member can add medications from the Wellet dashboard.',
+              'Your family can add medications from the '
+              'Wellet dashboard. They will appear here '
+              'when added.',
               style: GoogleFonts.dmSans(
                 fontSize: 20,
                 color: WelletTheme.textSecondary,
+                height: 1.4,
               ),
-              textAlign: TextAlign.left,
+              textAlign: TextAlign.center,
             ),
           ],
         ),
@@ -131,7 +150,8 @@ class MedicationsScreen extends ConsumerWidget {
             ),
           ],
         ),
-        backgroundColor: isPositive ? WelletTheme.success : WelletTheme.textSecondary,
+        backgroundColor:
+            isPositive ? WelletTheme.success : WelletTheme.textSecondary,
         behavior: SnackBarBehavior.floating,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
         duration: const Duration(seconds: 2),

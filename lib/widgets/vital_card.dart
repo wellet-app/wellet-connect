@@ -24,7 +24,7 @@ class VitalCard extends StatelessWidget {
         width: fullWidth ? double.infinity : null,
         padding: const EdgeInsets.all(20),
         decoration: BoxDecoration(
-          color: WelletTheme.surfaceLight,
+          color: WelletTheme.surface,
           borderRadius: BorderRadius.circular(16),
         ),
         child: Column(
@@ -32,7 +32,15 @@ class VitalCard extends StatelessWidget {
           children: [
             Row(
               children: [
-                Icon(icon, color: WelletTheme.primary, size: 24),
+                Container(
+                  width: 32,
+                  height: 32,
+                  decoration: BoxDecoration(
+                    color: WelletTheme.primary.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Icon(icon, color: WelletTheme.primary, size: 18),
+                ),
                 const SizedBox(width: 8),
                 Text(
                   label,
@@ -44,7 +52,7 @@ class VitalCard extends StatelessWidget {
                 ),
               ],
             ),
-            const SizedBox(height: 8),
+            const SizedBox(height: 12),
             Text(
               value,
               style: GoogleFonts.dmSerifDisplay(

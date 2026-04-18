@@ -42,9 +42,10 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     final authState = ref.watch(authProvider);
 
     return Scaffold(
+      backgroundColor: WelletTheme.background,
       body: SafeArea(
         child: SingleChildScrollView(
-          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 48),
+          padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 48),
           child: Form(
             key: _formKey,
             child: Column(
@@ -52,21 +53,27 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
               children: [
                 const SizedBox(height: 48),
 
-                // Logo / Brand
+                // Logo
                 Container(
                   width: 72,
                   height: 72,
                   decoration: BoxDecoration(
                     color: WelletTheme.primary,
                     borderRadius: BorderRadius.circular(20),
+                    boxShadow: [
+                      BoxShadow(
+                        color: WelletTheme.primary.withOpacity(0.25),
+                        blurRadius: 20,
+                        offset: const Offset(0, 6),
+                      ),
+                    ],
                   ),
-                  child: const Center(
+                  child: Center(
                     child: Text(
                       'W',
-                      style: TextStyle(
+                      style: GoogleFonts.dmSerifDisplay(
                         color: Colors.white,
                         fontSize: 36,
-                        fontWeight: FontWeight.bold,
                       ),
                     ),
                   ),
@@ -75,18 +82,19 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
 
                 // Welcome heading
                 Text(
-                  'Welcome to\nWellet Connect',
+                  'Welcome back',
                   style: GoogleFonts.dmSerifDisplay(
                     fontSize: 32,
                     color: WelletTheme.textPrimary,
                   ),
                 ),
-                const SizedBox(height: 12),
+                const SizedBox(height: 8),
                 Text(
-                  'Sign in to stay connected with your family.',
+                  "Sign in to connect with your family's care circle.",
                   style: GoogleFonts.dmSans(
                     fontSize: AppConstants.minFontSize,
                     color: WelletTheme.textSecondary,
+                    height: 1.4,
                   ),
                 ),
                 const SizedBox(height: 40),
@@ -97,15 +105,27 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                     width: double.infinity,
                     padding: const EdgeInsets.all(16),
                     decoration: BoxDecoration(
-                      color: WelletTheme.error.withOpacity(0.1),
+                      color: WelletTheme.error.withOpacity(0.08),
                       borderRadius: BorderRadius.circular(12),
                     ),
-                    child: Text(
-                      authState.error!,
-                      style: GoogleFonts.dmSans(
-                        fontSize: 18,
-                        color: WelletTheme.error,
-                      ),
+                    child: Row(
+                      children: [
+                        const Icon(
+                          Icons.error_outline,
+                          color: WelletTheme.error,
+                          size: 24,
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Text(
+                            authState.error!,
+                            style: GoogleFonts.dmSans(
+                              fontSize: 18,
+                              color: WelletTheme.error,
+                            ),
+                          ),
+                        ),
+                      ],
                     ),
                   ),
                   const SizedBox(height: 16),
@@ -117,10 +137,10 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                     width: double.infinity,
                     padding: const EdgeInsets.all(20),
                     decoration: BoxDecoration(
-                      color: WelletTheme.success.withOpacity(0.1),
+                      color: WelletTheme.success.withOpacity(0.08),
                       borderRadius: BorderRadius.circular(16),
                       border: Border.all(
-                        color: WelletTheme.success.withOpacity(0.3),
+                        color: WelletTheme.success.withOpacity(0.2),
                       ),
                     ),
                     child: Column(
@@ -151,6 +171,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                           style: GoogleFonts.dmSans(
                             fontSize: 18,
                             color: WelletTheme.textSecondary,
+                            height: 1.4,
                           ),
                         ),
                       ],
@@ -211,16 +232,35 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                     ),
                   ),
                 ),
-                const SizedBox(height: 24),
+                const SizedBox(height: 32),
 
                 // Privacy note
-                Text(
-                  AppConstants.privacyMessage,
-                  style: GoogleFonts.dmSans(
-                    fontSize: 16,
-                    color: WelletTheme.textSecondary,
+                Container(
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: WelletTheme.surface,
+                    borderRadius: BorderRadius.circular(12),
                   ),
-                  textAlign: TextAlign.left,
+                  child: Row(
+                    children: [
+                      Icon(
+                        Icons.lock_outline,
+                        color: WelletTheme.textSecondary.withOpacity(0.6),
+                        size: 20,
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Text(
+                          AppConstants.privacyMessage,
+                          style: GoogleFonts.dmSans(
+                            fontSize: 16,
+                            color: WelletTheme.textSecondary,
+                            height: 1.4,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
               ],
             ),
