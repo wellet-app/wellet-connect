@@ -16,8 +16,8 @@ class HealthSyncService {
     HealthDataType.WEIGHT,
   ];
 
-  static const List<HealthDataAccess> _permissions =
-      [for (var _ in _types) HealthDataAccess.READ];
+  static final List<HealthDataAccess> _permissions =
+      List<HealthDataAccess>.filled(_types.length, HealthDataAccess.READ);
 
   Future<bool> requestPermissions() async {
     final hasPermissions = await _health.hasPermissions(_types,
@@ -47,7 +47,7 @@ class HealthSyncService {
 
     _lastSyncTime = now;
 
-    final uniqueData = Health.removeDuplicates(healthData);
+    final uniqueData = _dedupeHealthData(healthData);
 
     return uniqueData.map((point) {
       final numValue = _extractNumericValue(point.value);
@@ -194,6 +194,22 @@ class HealthSyncService {
     }
   }
 
+  /// Manual dedupe to replace the removed Health.removeDuplicates static.
+  /// Two points are considered duplicates if their type, dateFrom, dateTo,
+  /// and numeric value all match. Stable order: keeps first occurrence.
+  static List<HealthDataPoint> _dedupeHealthData(
+      List<HealthDataPoint> points) {
+    final seen = <String>{};
+    final result = <HealthDataPoint>[];
+    for (final p in points) {
+      final num = _extractNumericValue(p.value);
+      final key =
+          '${p.type}|${p.dateFrom.toIso8601String()}|${p.dateTo.toIso8601String()}|$num';
+      if (seen.add(key)) result.add(p);
+    }
+    return result;
+  }
+
   static double _extractNumericValue(HealthValue value) {
     if (value is NumericHealthValue) {
       return value.numericValue.toDouble();
@@ -213,7 +229,7 @@ class HealthSyncService {
       endTime: now,
     );
 
-    final unique = Health.removeDuplicates(data);
+    final unique = _dedupeHealthData(data);
 
     double steps = 0;
     double? latestHeartRate;

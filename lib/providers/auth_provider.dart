@@ -84,6 +84,32 @@ class AuthNotifier extends StateNotifier<AuthState> {
     }
   }
 
+  /// Sign in with email + password. Used for both regular sign-in and the
+  /// debug-only "Skip auth" button.
+  Future<void> signInWithPassword({
+    required String email,
+    required String password,
+  }) async {
+    state = state.copyWith(error: null, magicLinkSent: false);
+    try {
+      await _supabaseService.signInWithPassword(
+        email: email,
+        password: password,
+      );
+      // _loadPerson is triggered by the authStateChanges listener.
+    } on AuthException catch (e) {
+      state = state.copyWith(
+        status: AuthStatus.unauthenticated,
+        error: e.message,
+      );
+    } catch (e) {
+      state = state.copyWith(
+        status: AuthStatus.unauthenticated,
+        error: 'Something went wrong. Please try again.',
+      );
+    }
+  }
+
   /// Send a magic link to the given email address
   Future<void> sendMagicLink({required String email}) async {
     state = state.copyWith(error: null, magicLinkSent: false);

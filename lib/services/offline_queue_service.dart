@@ -14,7 +14,10 @@ part 'offline_queue_service.g.dart';
 
 class QueuedOperations extends Table {
   IntColumn get id => integer().autoIncrement()();
-  TextColumn get tableName => text()();
+  // Renamed from `tableName` to avoid collision with Drift's built-in
+  // Table.tableName getter. The actual SQLite column is still 'table_name'
+  // (Drift snake_cases by default), so existing local queues remain valid.
+  TextColumn get targetTable => text().named('table_name')();
   TextColumn get operation => text()(); // insert, upsert
   TextColumn get payload => text()(); // JSON-encoded row data
   DateTimeColumn get createdAt => dateTime().withDefault(currentDateAndTime)();
@@ -66,7 +69,7 @@ class OfflineQueueService {
   }) async {
     await _db.into(_db.queuedOperations).insert(
           QueuedOperationsCompanion.insert(
-            tableName: table,
+            targetTable: table,
             operation: operation,
             payload: jsonEncode(data),
           ),
@@ -85,12 +88,12 @@ class OfflineQueueService {
         switch (item.operation) {
           case 'insert':
             await _supabaseService.client
-                .from(item.tableName)
+                .from(item.targetTable)
                 .insert(data);
             break;
           case 'upsert':
             await _supabaseService.client
-                .from(item.tableName)
+                .from(item.targetTable)
                 .upsert(data);
             break;
         }

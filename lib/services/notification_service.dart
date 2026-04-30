@@ -1,4 +1,6 @@
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
+import 'package:timezone/timezone.dart' as tz;
+import 'package:timezone/data/latest_all.dart' as tz_data;
 import '../models/medication.dart';
 
 class NotificationService {
@@ -11,6 +13,9 @@ class NotificationService {
   static const String _checkinChannelName = 'Daily Check-in';
 
   Future<void> initialize() async {
+    // Initialize the timezone database. Required before TZDateTime works.
+    tz_data.initializeTimeZones();
+
     const androidSettings =
         AndroidInitializationSettings('@mipmap/ic_launcher');
     const iosSettings = DarwinInitializationSettings(
@@ -97,6 +102,8 @@ class NotificationService {
           ),
         ),
         androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
+        uiLocalNotificationDateInterpretation:
+            UILocalNotificationDateInterpretation.absoluteTime,
         matchDateTimeComponents: DateTimeComponents.time,
       );
     }
@@ -126,6 +133,8 @@ class NotificationService {
         ),
       ),
       androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
+      uiLocalNotificationDateInterpretation:
+          UILocalNotificationDateInterpretation.absoluteTime,
       matchDateTimeComponents: DateTimeComponents.time,
     );
   }
@@ -145,10 +154,10 @@ class NotificationService {
     // Navigation handled by GoRouter deep links
   }
 
-  // Helper: convert DateTime to TZDateTime-compatible object.
-  // In production, use the timezone package for proper tz handling.
-  // For the MVP we schedule with local time.
-  TZDateTime _convertToTZDateTime(DateTime dateTime) {
-    return TZDateTime.from(dateTime, local);
+  /// Convert a local DateTime to a TZDateTime in the device's local zone.
+  /// `tz_data.initializeTimeZones()` must have run first (called in
+  /// `initialize()`).
+  tz.TZDateTime _convertToTZDateTime(DateTime dateTime) {
+    return tz.TZDateTime.from(dateTime, tz.local);
   }
 }
