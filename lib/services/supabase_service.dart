@@ -22,6 +22,16 @@ class SupabaseService {
     );
   }
 
+  Future<void> signInWithPassword({
+    required String email,
+    required String password,
+  }) async {
+    await _client.auth.signInWithPassword(
+      email: email,
+      password: password,
+    );
+  }
+
   Future<void> signOut() async {
     await _client.auth.signOut();
   }

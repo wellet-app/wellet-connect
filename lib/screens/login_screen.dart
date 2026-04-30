@@ -1,9 +1,16 @@
+import 'package:flutter/foundation.dart' show kDebugMode;
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
-import '../config/constants.dart';
 import '../config/theme.dart';
 import '../providers/auth_provider.dart';
+import '../widgets/wellet_logo.dart';
+
+// Hardcoded test credentials used by the debug-only "Skip auth" button.
+// Never shipped in release builds (see kDebugMode guard below).
+const _kDevTestEmail = 'betsy.eble@gmail.com';
+const _kDevTestPassword = 'WC-6eUfw4VGlRNvpr7H';
 
 class LoginScreen extends ConsumerStatefulWidget {
   const LoginScreen({super.key});
@@ -16,6 +23,9 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   final _emailController = TextEditingController();
   final _formKey = GlobalKey<FormState>();
   bool _isLoading = false;
+  // Snapshot of the email at submission so the confirmation message survives
+  // controller clears or widget rebuilds.
+  String _submittedEmail = '';
 
   @override
   void dispose() {
@@ -26,12 +36,25 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   Future<void> _handleSendMagicLink() async {
     if (!_formKey.currentState!.validate()) return;
 
+    final email = _emailController.text.trim();
+    setState(() {
+      _isLoading = true;
+      _submittedEmail = email;
+    });
+
+    await ref.read(authProvider.notifier).sendMagicLink(email: email);
+
+    if (mounted) {
+      setState(() => _isLoading = false);
+    }
+  }
+
+  Future<void> _handleSkipAuth() async {
     setState(() => _isLoading = true);
-
-    await ref.read(authProvider.notifier).sendMagicLink(
-          email: _emailController.text.trim(),
+    await ref.read(authProvider.notifier).signInWithPassword(
+          email: _kDevTestEmail,
+          password: _kDevTestPassword,
         );
-
     if (mounted) {
       setState(() => _isLoading = false);
     }
@@ -41,231 +64,301 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   Widget build(BuildContext context) {
     final authState = ref.watch(authProvider);
 
-    return Scaffold(
-      backgroundColor: WelletTheme.background,
-      body: SafeArea(
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 48),
-          child: Form(
-            key: _formKey,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const SizedBox(height: 48),
-
-                // Logo
-                Container(
-                  width: 72,
-                  height: 72,
-                  decoration: BoxDecoration(
-                    color: WelletTheme.primary,
-                    borderRadius: BorderRadius.circular(20),
-                    boxShadow: [
-                      BoxShadow(
-                        color: WelletTheme.primary.withOpacity(0.25),
-                        blurRadius: 20,
-                        offset: const Offset(0, 6),
-                      ),
-                    ],
+    // Status bar: light icons on moss bg, per spec §5 + §15.
+    return AnnotatedRegion<SystemUiOverlayStyle>(
+      value: const SystemUiOverlayStyle(
+        statusBarColor: Colors.transparent,
+        statusBarIconBrightness: Brightness.light, // Android
+        statusBarBrightness: Brightness.dark, // iOS (dark = light icons)
+      ),
+      child: Scaffold(
+        // Moss-led surface — Connect's default identity.
+        backgroundColor: WelletTheme.moss,
+        body: SafeArea(
+          // Top-only safe area; bottom uses MediaQuery padding so the CTA
+          // hovers above the home indicator without floating mid-air (spec §15).
+          bottom: false,
+          child: SingleChildScrollView(
+            physics: const AlwaysScrollableScrollPhysics(),
+            padding: EdgeInsets.fromLTRB(
+              24,
+              32, // breathing room below status bar
+              24,
+              MediaQuery.of(context).padding.bottom + 24,
+            ),
+            child: Form(
+              key: _formKey,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // ─── Identity ─────────────────────────────────────────
+                  const WelletConnectLockup(
+                    wordmarkHeight: 32,
+                    surface: ConnectSurface.moss,
                   ),
-                  child: Center(
+                  const SizedBox(height: 12),
+                  Text(
+                    'Your side of the care circle',
+                    style: GoogleFonts.dmSans(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w400,
+                      color: WelletTheme.cream.withOpacity(0.85),
+                    ),
+                  ),
+
+                  const SizedBox(height: 56),
+
+                  // ─── Welcome ──────────────────────────────────────────
+                  Text(
+                    'Welcome to Wellet Connect',
+                    style: GoogleFonts.dmSerifDisplay(
+                      fontSize: 32,
+                      fontWeight: FontWeight.w400,
+                      color: WelletTheme.cream,
+                      height: 1.18,
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  ConstrainedBox(
+                    constraints: const BoxConstraints(maxWidth: 320),
                     child: Text(
-                      'W',
-                      style: GoogleFonts.dmSerifDisplay(
-                        color: Colors.white,
-                        fontSize: 36,
+                      'Sign in to choose what you share, with whom, and when. '
+                      'Your record. Your call.',
+                      style: GoogleFonts.dmSans(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w400,
+                        color: WelletTheme.warmWhite.withOpacity(0.85),
+                        height: 1.55,
                       ),
                     ),
                   ),
-                ),
-                const SizedBox(height: 32),
 
-                // Welcome heading
-                Text(
-                  'Welcome back',
-                  style: GoogleFonts.dmSerifDisplay(
-                    fontSize: 32,
-                    color: WelletTheme.textPrimary,
-                  ),
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  "Sign in to connect with your family's care circle.",
-                  style: GoogleFonts.dmSans(
-                    fontSize: AppConstants.minFontSize,
-                    color: WelletTheme.textSecondary,
-                    height: 1.4,
-                  ),
-                ),
-                const SizedBox(height: 40),
+                  const SizedBox(height: 40),
 
-                // Error message
-                if (authState.error != null) ...[
-                  Container(
-                    width: double.infinity,
-                    padding: const EdgeInsets.all(16),
-                    decoration: BoxDecoration(
-                      color: WelletTheme.error.withOpacity(0.08),
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: Row(
-                      children: [
-                        const Icon(
-                          Icons.error_outline,
-                          color: WelletTheme.error,
-                          size: 24,
-                        ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: Text(
-                            authState.error!,
-                            style: GoogleFonts.dmSans(
-                              fontSize: 18,
-                              color: WelletTheme.error,
-                            ),
-                          ),
-                        ),
-                      ],
+                  // ─── Error ────────────────────────────────────────────
+                  if (authState.error != null) ...[
+                    _ErrorBanner(message: authState.error!),
+                    const SizedBox(height: 16),
+                  ],
+
+                  // ─── Magic-link sent confirmation ─────────────────────
+                  if (authState.magicLinkSent) ...[
+                    _MagicLinkSentCard(submittedEmail: _submittedEmail),
+                    const SizedBox(height: 16),
+                  ],
+
+                  // ─── Email input ──────────────────────────────────────
+                  Semantics(
+                    label: 'Email address',
+                    child: TextFormField(
+                      controller: _emailController,
+                      keyboardType: TextInputType.emailAddress,
+                      autocorrect: false,
+                      style: GoogleFonts.dmSans(
+                        fontSize: 16,
+                        color: WelletTheme.textPrimary,
+                      ),
+                      decoration: const InputDecoration(
+                        labelText: 'Email address',
+                        hintText: 'you@example.com',
+                      ),
+                      validator: (value) {
+                        if (value == null || value.trim().isEmpty) {
+                          return 'Please enter your email';
+                        }
+                        if (!value.contains('@')) {
+                          return 'Please enter a valid email';
+                        }
+                        return null;
+                      },
                     ),
                   ),
+
                   const SizedBox(height: 16),
-                ],
 
-                // Magic link sent confirmation
-                if (authState.magicLinkSent) ...[
-                  Container(
-                    width: double.infinity,
-                    padding: const EdgeInsets.all(20),
-                    decoration: BoxDecoration(
-                      color: WelletTheme.success.withOpacity(0.08),
-                      borderRadius: BorderRadius.circular(16),
-                      border: Border.all(
-                        color: WelletTheme.success.withOpacity(0.2),
+                  // ─── Primary CTA ──────────────────────────────────────
+                  Semantics(
+                    button: true,
+                    label: 'Send sign-in link',
+                    child: SizedBox(
+                      width: double.infinity,
+                      height: 56,
+                      child: ElevatedButton(
+                        onPressed: _isLoading ? null : _handleSendMagicLink,
+                        child: _isLoading
+                            ? const SizedBox(
+                                width: 22,
+                                height: 22,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                  color: WelletTheme.mossDark,
+                                ),
+                              )
+                            : Text(
+                                authState.magicLinkSent
+                                    ? 'Resend Link'
+                                    : 'Send Sign-in Link',
+                              ),
                       ),
                     ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Row(
-                          children: [
-                            const Icon(
-                              Icons.mark_email_read,
-                              color: WelletTheme.success,
-                              size: 28,
-                            ),
-                            const SizedBox(width: 12),
-                            Text(
-                              'Check your email',
-                              style: GoogleFonts.dmSans(
-                                fontSize: 22,
-                                fontWeight: FontWeight.w700,
-                                color: WelletTheme.success,
-                              ),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 12),
-                        Text(
-                          'We sent a sign-in link to ${_emailController.text.trim()}. '
-                          'Tap the link in the email to sign in.',
-                          style: GoogleFonts.dmSans(
-                            fontSize: 18,
-                            color: WelletTheme.textSecondary,
-                            height: 1.4,
-                          ),
-                        ),
-                      ],
-                    ),
                   ),
+
+                  // ─── DEBUG-ONLY skip-auth ─────────────────────────────
+                  if (kDebugMode) ...[
+                    const SizedBox(height: 12),
+                    SizedBox(
+                      width: double.infinity,
+                      height: 56,
+                      child: OutlinedButton.icon(
+                        onPressed: _isLoading ? null : _handleSkipAuth,
+                        icon: const Icon(Icons.bolt_outlined, size: 20),
+                        label: const Text('Skip auth (test mode)'),
+                      ),
+                    ),
+                    const SizedBox(height: 6),
+                    Text(
+                      'Debug build only · signs in as $_kDevTestEmail',
+                      style: GoogleFonts.dmSans(
+                        fontSize: 12,
+                        color: WelletTheme.cream.withOpacity(0.65),
+                      ),
+                    ),
+                  ],
+
                   const SizedBox(height: 24),
+
+                  // ─── Privacy card (mint, on moss) ─────────────────────
+                  const _PrivacyCard(),
                 ],
-
-                // Email field
-                Semantics(
-                  label: 'Email address',
-                  child: TextFormField(
-                    controller: _emailController,
-                    keyboardType: TextInputType.emailAddress,
-                    autocorrect: false,
-                    style:
-                        GoogleFonts.dmSans(fontSize: AppConstants.minFontSize),
-                    decoration: const InputDecoration(
-                      labelText: 'Email address',
-                      hintText: 'you@example.com',
-                    ),
-                    validator: (value) {
-                      if (value == null || value.trim().isEmpty) {
-                        return 'Please enter your email';
-                      }
-                      if (!value.contains('@')) {
-                        return 'Please enter a valid email';
-                      }
-                      return null;
-                    },
-                  ),
-                ),
-                const SizedBox(height: 32),
-
-                // Send magic link button
-                Semantics(
-                  button: true,
-                  label: 'Send sign-in link',
-                  child: SizedBox(
-                    width: double.infinity,
-                    height: AppConstants.minTouchTarget,
-                    child: ElevatedButton(
-                      onPressed: _isLoading ? null : _handleSendMagicLink,
-                      child: _isLoading
-                          ? const SizedBox(
-                              width: 24,
-                              height: 24,
-                              child: CircularProgressIndicator(
-                                strokeWidth: 2,
-                                color: Colors.white,
-                              ),
-                            )
-                          : Text(
-                              authState.magicLinkSent
-                                  ? 'Resend Link'
-                                  : 'Send Sign-in Link',
-                            ),
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 32),
-
-                // Privacy note
-                Container(
-                  padding: const EdgeInsets.all(16),
-                  decoration: BoxDecoration(
-                    color: WelletTheme.surface,
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: Row(
-                    children: [
-                      Icon(
-                        Icons.lock_outline,
-                        color: WelletTheme.textSecondary.withOpacity(0.6),
-                        size: 20,
-                      ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: Text(
-                          AppConstants.privacyMessage,
-                          style: GoogleFonts.dmSans(
-                            fontSize: 16,
-                            color: WelletTheme.textSecondary,
-                            height: 1.4,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
+              ),
             ),
           ),
         ),
+      ),
+    );
+  }
+}
+
+class _ErrorBanner extends StatelessWidget {
+  final String message;
+  const _ErrorBanner({required this.message});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: WelletTheme.warmWhite,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: WelletTheme.cardBorderOnMoss),
+      ),
+      child: Row(
+        children: [
+          const Icon(Icons.error_outline, color: WelletTheme.red, size: 20),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Text(
+              message,
+              style: GoogleFonts.dmSans(
+                fontSize: 14,
+                color: WelletTheme.textPrimary,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _MagicLinkSentCard extends StatelessWidget {
+  final String submittedEmail;
+  const _MagicLinkSentCard({required this.submittedEmail});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: WelletTheme.warmWhite,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: WelletTheme.cardBorderOnMoss),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Icon(
+                Icons.mark_email_read_outlined,
+                color: WelletTheme.moss,
+                size: 22,
+              ),
+              const SizedBox(width: 10),
+              Text(
+                'Check your email',
+                style: GoogleFonts.dmSans(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w500,
+                  color: WelletTheme.textPrimary,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          Text(
+            submittedEmail.isNotEmpty
+                ? 'We sent a sign-in link to $submittedEmail. '
+                    'Tap the link in the email to sign in.'
+                : 'We sent you a sign-in link. Tap the link in the email to '
+                    'sign in.',
+            style: GoogleFonts.dmSans(
+              fontSize: 14,
+              color: WelletTheme.textSecondary,
+              height: 1.5,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _PrivacyCard extends StatelessWidget {
+  const _PrivacyCard();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+      decoration: BoxDecoration(
+        color: WelletTheme.mint,
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.center,
+        children: [
+          const Icon(
+            Icons.lock_outline,
+            color: WelletTheme.mintDeep,
+            size: 18,
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Text(
+              'Your health information is encrypted and only seen by people '
+              'you invite.',
+              style: GoogleFonts.dmSans(
+                fontSize: 13,
+                color: WelletTheme.textPrimary,
+                height: 1.45,
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }

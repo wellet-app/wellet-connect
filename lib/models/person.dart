@@ -1,37 +1,49 @@
+/// Mirrors the `people` table in Supabase.
+/// Schema reality: single `name` column (not first/last), nullable created_at.
 class Person {
   final String id;
   final String userId;
-  final String? firstName;
-  final String? lastName;
+  final String? name;
   final DateTime? dateOfBirth;
-  final DateTime createdAt;
+  final DateTime? createdAt;
 
   Person({
     required this.id,
     required this.userId,
-    this.firstName,
-    this.lastName,
+    this.name,
     this.dateOfBirth,
-    required this.createdAt,
+    this.createdAt,
   });
 
   String get displayName {
-    if (firstName != null && lastName != null) {
-      return '$firstName $lastName';
+    final trimmed = name?.trim();
+    if (trimmed != null && trimmed.isNotEmpty) {
+      return trimmed;
     }
-    return firstName ?? 'Your loved one';
+    return 'Your loved one';
+  }
+
+  /// First word of the name, useful for casual greetings.
+  /// Returns null if the person has no name set, so callers can use
+  /// their own fallback (e.g. 'there').
+  String? get firstName {
+    final trimmed = name?.trim();
+    if (trimmed == null || trimmed.isEmpty) return null;
+    final parts = trimmed.split(RegExp(r'\s+'));
+    return parts.isNotEmpty ? parts.first : trimmed;
   }
 
   factory Person.fromJson(Map<String, dynamic> json) {
     return Person(
       id: json['id'] as String,
       userId: json['user_id'] as String,
-      firstName: json['first_name'] as String?,
-      lastName: json['last_name'] as String?,
+      name: json['name'] as String?,
       dateOfBirth: json['date_of_birth'] != null
           ? DateTime.parse(json['date_of_birth'] as String)
           : null,
-      createdAt: DateTime.parse(json['created_at'] as String),
+      createdAt: json['created_at'] != null
+          ? DateTime.parse(json['created_at'] as String)
+          : null,
     );
   }
 
@@ -39,11 +51,10 @@ class Person {
     return {
       'id': id,
       'user_id': userId,
-      if (firstName != null) 'first_name': firstName,
-      if (lastName != null) 'last_name': lastName,
+      if (name != null) 'name': name,
       if (dateOfBirth != null)
         'date_of_birth': dateOfBirth!.toIso8601String(),
-      'created_at': createdAt.toIso8601String(),
+      if (createdAt != null) 'created_at': createdAt!.toIso8601String(),
     };
   }
 }
