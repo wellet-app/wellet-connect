@@ -27,3 +27,7 @@ android/.idea/
 # AI tooling config — do not commit (may contain tokens)
 .mcp.json
 .aider*
+
+# Claude Code local config (per-developer, never committed)
+.claude/
+CLAUDE.md
